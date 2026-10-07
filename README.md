@@ -12,3 +12,11 @@ keys or WASD. The button in the top right switches the sound between
 chimes, hum and off. All sound is made in the page; nothing is recorded.
 
 Where the pictures and star data come from is in [CREDITS.md](CREDITS.md).
+
+## Licence
+
+The code is under the [MIT licence](LICENSE). The maps and star data packed
+inside the page keep their own terms (public domain, or free with credit);
+see [CREDITS.md](CREDITS.md).
+
+Made by w00l23, with help from Claude (Anthropic).
