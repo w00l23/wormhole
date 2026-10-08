@@ -17,18 +17,57 @@
     opacity: 0; transition: opacity .3s ease;
   }
   #hint.on { opacity: .82; transition: opacity 1.4s ease; }
-  #snd {
-    position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 12px; padding: 10px; background: none; border: 0; cursor: pointer;
+  #snd, #mode {
+    position: fixed; top: calc(10px + env(safe-area-inset-top)); padding: 10px; background: none; border: 0; cursor: pointer;
     font: 500 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; letter-spacing: .24em; text-transform: uppercase;
     color: #eadcff; text-shadow: 0 0 12px rgba(138, 43, 226, .9); opacity: .4; transition: opacity .3s ease;
   }
-  #snd:hover, #snd:focus-visible { opacity: .9; outline: none; }
+  #snd { right: 12px; }
+  #mode { left: 12px; }
+  #snd:hover, #snd:focus-visible, #mode:hover, #mode:focus-visible { opacity: .9; outline: none; }
+  /* the time machine's words: a caption under each act, the clocks and speed on the trip, the gap, the slider, the note */
+  #tm { display: none; }
+  #tm.on { display: block; }
+  #tm > div {
+    position: fixed; left: 0; right: 0; text-align: center; pointer-events: none; user-select: none; -webkit-user-select: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: #eadcff;
+    text-shadow: 0 0 14px rgba(138, 43, 226, .85), 0 0 2px rgba(0, 0, 0, .8); opacity: 0; transition: opacity .7s ease;
+  }
+  #cap { bottom: calc(60px + env(safe-area-inset-bottom)); padding: 0 24px; font-size: 14px; line-height: 1.5; font-weight: 400; }
+  #cap.on { opacity: .9; }
+  #gap { bottom: calc(112px + env(safe-area-inset-bottom)); font-size: 40px; line-height: 1.2; font-weight: 300; letter-spacing: .06em; color: #fff;
+    text-shadow: 0 0 28px rgba(190, 150, 255, .95), 0 0 70px rgba(138, 43, 226, .7); transition: opacity 1.8s ease; }
+  #gap.on { opacity: 1; }
+  #hud { bottom: calc(102px + env(safe-area-inset-bottom)); display: flex; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap; padding: 0 16px;
+    font-size: 11px; line-height: 1; font-weight: 500; letter-spacing: .22em; text-transform: uppercase; }
+  #hud.on { opacity: .85; }
+  #hud .bar { display: block; width: 170px; height: 3px; border-radius: 2px; background: rgba(234, 220, 255, .14); overflow: hidden; }
+  #hud .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #1ad9c4, #8f6bff); box-shadow: 0 0 10px rgba(138, 43, 226, .9); }
+  #ctl { top: calc(46px + env(safe-area-inset-top)); display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px 12px; padding: 0 16px; pointer-events: auto;
+    font-size: 11px; line-height: 1; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; }
+  #ctl span { white-space: nowrap; }
+  #ctl.on { opacity: .55; }
+  #ctl.on:hover { opacity: .9; }
+  #ctl input { -webkit-appearance: none; appearance: none; width: 150px; height: 3px; margin: 0; border-radius: 2px; background: rgba(234, 220, 255, .25); outline: none; cursor: pointer; touch-action: auto; }
+  #ctl input::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #eadcff; box-shadow: 0 0 10px rgba(138, 43, 226, .95); }
+  #ctl input::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #eadcff; box-shadow: 0 0 10px rgba(138, 43, 226, .95); }
+  #ctl input:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(234, 220, 255, .35), 0 0 10px rgba(138, 43, 226, .95); }
+  #note { bottom: calc(104px + env(safe-area-inset-bottom)); margin: 0 auto; max-width: 560px; padding: 0 24px; font-size: 12px; line-height: 1.55; font-weight: 400; color: #cbbbea; }
+  #note.on { opacity: .8; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="hint"></div>
 <button id="snd" type="button">Sound: chimes</button>
+<button id="mode" type="button">Time machine</button>
+<div id="tm">
+  <div id="ctl"><span>Top speed</span><input id="vmax" type="range" min="0" max="1000" value="741" aria-label="The ship's top speed, as a share of the speed of light"><span id="ctlLbl"></span></div>
+  <div id="gap"></div>
+  <div id="hud"><span id="hudA"></span><span class="bar"><i id="hudBar"></i></span><span id="hudV"></span><span id="hudB"></span></div>
+  <div id="note">Why it might not work: a wormhole needs exotic matter, with negative energy, to hold its throat open. And Hawking's chronology protection conjecture says the laws of physics may forbid a time machine from ever forming.</div>
+  <div id="cap"></div>
+</div>
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
@@ -215,6 +254,13 @@ const starTint = bv => {                                 // a star's colour from
   return [1, 2, 3].map(c => lerp(TINT[k][c], TINT[k + 1][c], t));
 };
 const BRIGHT = [];                                       // the stars bright enough to leave a streak in the tunnel: where, how bright, what colour
+// at speed (the time machine's flight), light met head-on is squeezed toward blue and bunched brighter, light from
+// behind is stretched toward red and thinned. uDop is how much; uDopFwd the way the ship is going, in the sky's frame
+const DOP = { uDop: { value: 0 }, uDopFwd: { value: V3(0, 0, -1) } };
+const DOPPLER = /* glsl */`
+uniform float uDop; uniform vec3 uDopFwd;
+vec3 doppler(vec3 d) { float ahead = dot(d, uDopFwd); return mix(vec3(1.0), mix(vec3(1.35, 0.72, 0.42), vec3(0.62, 0.82, 1.45), ahead * 0.5 + 0.5) * (1.0 + 0.9 * ahead), uDop); }
+`;
 let milkyTex;
 const milkyLoaded = new Promise(done => { milkyTex = mapTexture('milkyway', false, done); });
 {
@@ -248,9 +294,9 @@ const milkyLoaded = new Promise(done => { milkyTex = mapTexture('milkyway', fals
   g.setAttribute('aCol', new THREE.BufferAttribute(col, 3));
   g.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
   const stars = new THREE.Points(g, new THREE.ShaderMaterial({
-    uniforms: { uPx: { value: 1 } },
-    vertexShader: `attribute float aSize; attribute vec3 aCol; uniform float uPx; varying vec3 vCol;
-      void main() { vCol = aCol; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * uPx; }`,
+    uniforms: { uPx: { value: 1 }, ...DOP },
+    vertexShader: DOPPLER + `attribute float aSize; attribute vec3 aCol; uniform float uPx; varying vec3 vCol;
+      void main() { vCol = aCol * doppler(normalize(position)); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * uPx; }`,
     fragmentShader: `varying vec3 vCol;
       void main() { vec2 q = gl_PointCoord - 0.5; gl_FragColor = vec4(vCol * exp(-dot(q, q) * 18.0), 1.0); }`,
     blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
@@ -274,15 +320,15 @@ const milkyLoaded = new Promise(done => { milkyTex = mapTexture('milkyway', fals
   sg.setAttribute('aW', new THREE.BufferAttribute(sw, 1));
   sg.setIndex(sIdx);
   const streaks = new THREE.Mesh(sg, new THREE.ShaderMaterial({
-    uniforms: { uFwd: { value: V3(0, 0, -1) }, uStreak: { value: 0 }, uPx: stars.material.uniforms.uPx, uRes: { value: new THREE.Vector2(1, 1) } },
-    vertexShader: /* glsl */`
+    uniforms: { uFwd: { value: V3(0, 0, -1) }, uStreak: { value: 0 }, uPx: stars.material.uniforms.uPx, uRes: { value: new THREE.Vector2(1, 1) }, ...DOP },
+    vertexShader: DOPPLER + /* glsl */`
       attribute vec3 aCol; attribute vec2 aCorner; attribute float aW;
       uniform vec3 uFwd; uniform float uStreak, uPx; uniform vec2 uRes;
       varying vec3 vCol; varying vec2 vQ;
       void main() {
         vec3 d = normalize(position), tail = normalize(d - uFwd * uStreak);   // pushed away from straight ahead
         vec4 a = projectionMatrix * modelViewMatrix * vec4(d * 900.0, 1.0), b = projectionMatrix * modelViewMatrix * vec4(tail * 900.0, 1.0);
-        vCol = aCol; vQ = aCorner;
+        vCol = aCol * doppler(d); vQ = aCorner;
         if (uStreak < 0.0005 || a.w < 1.0 || b.w < 1.0) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }   // nothing to draw: put it past the far plane
         vec2 hr = uRes * 0.5, pa = a.xy / a.w * hr, pb = b.xy / b.w * hr, dir = pb - pa;   // in pixels from the middle of the screen
         float len = length(dir); dir = len > 0.01 ? dir / len : vec2(1.0, 0.0);
@@ -297,15 +343,15 @@ const milkyLoaded = new Promise(done => { milkyTex = mapTexture('milkyway', fals
   }));
   streaks.frustumCulled = false; streaks.renderOrder = -9; streaks.name = 'streaks';
   const milky = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), new THREE.ShaderMaterial({
-    uniforms: { uSky: { value: milkyTex }, uTilt: { value: new THREE.Vector2(CE, SE) } },
+    uniforms: { uSky: { value: milkyTex }, uTilt: { value: new THREE.Vector2(CE, SE) }, ...DOP },
     vertexShader: `varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: /* glsl */`
+    fragmentShader: DOPPLER + /* glsl */`
       uniform sampler2D uSky; uniform vec2 uTilt; varying vec3 vDir;
       void main() {
         vec3 d = normalize(vDir);
         vec3 eq = vec3(d.x, -uTilt.x * d.z - uTilt.y * d.y, -uTilt.y * d.z + uTilt.x * d.y);   // the map is drawn on the Earth's equator, not the plane of the planets
         vec2 uv = vec2(0.5 - atan(eq.y, eq.x) / 6.2831853, asin(clamp(eq.z, -1.0, 1.0)) / 3.1415927 + 0.5);   // right ascension runs leftward across it, from the middle
-        gl_FragColor = vec4(pow(texture2D(uSky, uv).rgb, vec3(1.1)), 1.0);
+        gl_FragColor = vec4(pow(texture2D(uSky, uv).rgb, vec3(1.1)) * doppler(d), 1.0);
       }`,
     side: THREE.BackSide, depthTest: false, depthWrite: false,
   }));
@@ -320,7 +366,7 @@ const milkyLoaded = new Promise(done => { milkyTex = mapTexture('milkyway', fals
 const earthTilt = new THREE.Group(); earthTilt.rotation.z = EPS; scene.add(earthTilt);
 const earthMat = new THREE.ShaderMaterial({
   uniforms: { uDay: { value: mapTexture('earth', true) }, uLand: { value: mapTexture('land', true) }, uClouds: { value: mapTexture('clouds', true) }, uNight: { value: mapTexture('night', true) },
-    uSun: { value: SUN }, uTime: { value: 0 } },
+    uSun: { value: SUN }, uTime: { value: 0 }, uPast: { value: 0 } },   // uPast: 1 when it is another year (the time machine): other clouds, fewer lights
   vertexShader: /* glsl */`
     varying vec3 vObj; varying vec3 vWN; varying vec3 vWorld;
     void main() {
@@ -330,7 +376,7 @@ const earthMat = new THREE.ShaderMaterial({
       gl_Position = projectionMatrix * viewMatrix * w;
     }`,
   fragmentShader: NOISE + /* glsl */`
-    uniform sampler2D uDay, uLand, uClouds, uNight; uniform vec3 uSun; uniform float uTime;
+    uniform sampler2D uDay, uLand, uClouds, uNight; uniform vec3 uSun; uniform float uTime, uPast;
     varying vec3 vObj; varying vec3 vWN; varying vec3 vWorld;
     // A picture wrapped round the globe: longitude runs across it, latitude up it. uA and uB are the same longitude with
     // their jump (where +180° meets -180°) on opposite sides of the world; how blurred to read the picture is worked out
@@ -347,7 +393,8 @@ const earthMat = new THREE.ShaderMaterial({
       vec3 ground = pow(globe(uDay, p, 0.0).rgb, vec3(0.9)) * 1.22 * (1.0 + (fbm3(p * 60.0) - 0.5) * 0.18);   // with a grain finer than the picture holds
       vec3 surf = mix(mix(vec3(0.030, 0.095, 0.240), vec3(0.045, 0.160, 0.320), pow(1.0 - abs(p.y), 2.5)), ground, land);
       // clouds: the real pattern, drifting east over the ground, frayed a little finer than the picture
-      float cloud = smoothstep(0.10, 0.85, globe(uClouds, p, -uTime * 0.004).r + (fbm3(p * 38.0 + 7.0) - 0.5) * 0.22);
+      vec3 pc = vec3(p.x, mix(p.y, -p.y, uPast), p.z);                                                   // (in another year they are other clouds)
+      float cloud = smoothstep(0.10, 0.85, globe(uClouds, pc, -uTime * 0.004 + uPast * 2.4).r + (fbm3(pc * 38.0 + 7.0) - 0.5) * 0.22);
 
       float ndl = dot(N, uSun), diff = max(ndl, 0.0) * smoothstep(-0.02, 0.10, ndl), day = smoothstep(-0.10, 0.22, ndl);
       float nh = max(dot(N, normalize(uSun + V)), 0.0);
@@ -357,7 +404,7 @@ const earthMat = new THREE.ShaderMaterial({
       float dusk = (1.0 - smoothstep(0.02, 0.30, ndl)) * smoothstep(-0.12, 0.02, ndl);
       col *= mix(vec3(1.0), vec3(1.0, 0.62, 0.38), dusk * 0.75);                                    // the edge of the day goes amber
       float lamp = globe(uNight, p, 0.0).r;
-      col += vec3(1.0, 0.76, 0.42) * lamp * lamp * (1.0 - day) * (1.0 - 0.8 * cloud) * 1.1;          // the cities, where it is night and the sky is clear
+      col += vec3(1.0, 0.76, 0.42) * lamp * lamp * (1.0 - day) * (1.0 - 0.8 * cloud) * 1.1 * (1.0 - 0.6 * uPast);    // the cities, where it is night and the sky is clear (fewer of them, in another year)
       float rim = pow(1.0 - max(dot(N, V), 0.0), 2.6);
       col = mix(col, vec3(0.32, 0.56, 1.0) * (0.12 + 0.88 * day), clamp(0.08 + 0.72 * rim, 0.0, 1.0) * (0.25 + 0.75 * day));   // air, thickest at the edge
       gl_FragColor = vec4(col, 1.0);
@@ -707,7 +754,7 @@ const windowMat = () => new THREE.MeshBasicMaterial({
 // ═════════════════════════════════════════════════════════════════════════
 const RIP_N = 7, RIP_K = 12, RIP_M = 8, RIP_H = 6;   // cracks · steps along a crack · steps across a flap · extra steps of hairline past the hole
 const RIP_PEEL = 1.65, RIP_OPEN = 4.0;               // on a rip's own clock: the first flap starts to lift · it is fully open
-function makeRip({ center, facing, radius, seed, closed, tint, key }) {
+function makeRip({ center, facing, radius, seed, closed, tint, key, throat }) {
   const g = new THREE.Group();
   g.position.copy(center); g.quaternion.setFromUnitVectors(V3(0, 0, 1), facing); g.scale.setScalar(radius); scene.add(g);
   const U = { uTime: { value: 0 }, uGrow: { value: 0 }, uInner: { value: 1 }, uOuter: { value: 0.75 }, uBurn: { value: 1 }, uDot: { value: 0 }, uHalo: { value: 0 },
@@ -836,6 +883,32 @@ function makeRip({ center, facing, radius, seed, closed, tint, key }) {
   // 3 · the hole itself (the corners joined up), as the window the tube is seen through
   const mask = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(corners)), windowMat());
   mask.renderOrder = 1; g.add(mask);
+  // 3b · a mouth of the time machine is not flown down: what shows through it is a throat, the same wet film as the
+  //      tunnel walls, sliding slowly inward and falling away into the dark in the middle. Seen only through the hole.
+  if (throat) {
+    const th = new THREE.Mesh(new THREE.CircleGeometry(1.06, 64).translate(0, 0, -0.015), new THREE.ShaderMaterial({
+      uniforms: U,
+      vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: NOISE + SHEEN + /* glsl */`
+        uniform float uTime; uniform vec3 uTint; varying vec2 vUv;
+        void main() {
+          vec2 q = (vUv - 0.5) * 2.0; float r = length(q), ang = atan(q.y, q.x);
+          vec3 p = vec3(cos(ang) * 0.8, sin(ang) * 0.8, 0.0) * (1.0 + 1.6 * r) + vec3(0.0, 0.0, r * 2.4 + uTime * 0.09);   // the film, drawn in toward the middle
+          vec3 w = vec3(vnoise(p * 1.3 + uTime * 0.03), vnoise(p * 1.3 + vec3(7.1, 3.3, -uTime * 0.04)), vnoise(p * 1.3 + vec3(-4.2, 9.7, uTime * 0.03)));
+          p += (w - 0.5) * 1.5;
+          float h = smoothstep(0.18, 0.82, fbm3(p));
+          vec3 film = sheen((0.95 + 1.45 * h) + r * 0.5 + uTime * 0.012);
+          float pit = exp(-r * r * 2.2);                                                        // the middle falls away
+          float light = (0.30 + 0.70 * pow(h, 1.5)) * (0.25 + 0.75 * r) * (1.0 - 0.8 * pit);
+          vec3 col = vec3(0.011, 0.011, 0.016) * (0.6 + 0.8 * w.x);
+          col += mix(uTint, film, 0.65) * light * 1.1;
+          col += film * pow(h, 6.0) * 0.5 * (1.0 - pit);                                        // wet glints
+          gl_FragColor = vec4(mix(col, vec3(0.060, 0.042, 0.115), pit * 0.6), 1.0);
+        }`,
+      stencilWrite: true, stencilRef: 1, stencilFunc: THREE.EqualStencilFunc,
+    }));
+    th.renderOrder = 2; g.add(th);
+  }
 
   // 4 · the dot it all starts from, and the faint light that spills out once it is open
   const glow = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.ShaderMaterial({
@@ -1050,6 +1123,26 @@ function flyShip(dt, t, s, going, deep) {
   }
   const seen = 1 - ss(7, 13, rig.position.distanceTo(camera.position));   // far off, it winks out
   ship.visible = seen > 0.01;
+  const thr = going ? ss(0, 0.3, t) : 0;                                            // the engines light the instant the trip starts…
+  const boost = thr * (1 - 0.55 * ss(S_A, S_A + 8, s));                             // …in a hard burn that holds until the ship is well through
+  shipBody(dt, thr, boost, deep, seen);
+
+  // the field's glow: it comes on once the ship is at top speed, rides just ahead of the nose on the way out and further
+  // ahead in the tunnel, and fades as the ship leaves the far mouth
+  const fieldK = going ? ss(T_FIELD, T_FIELD + 0.5, t) * (1 - ss(S_B - 5, S_B, s)) : 0;
+  rig.updateMatrixWorld(true);
+  ship.localToWorld(_n.set(0, 0, -0.56));                                           // the nose, for the lens too
+  fieldGlow.visible = fieldK > 0.002;
+  fieldGlow.position.copy(_n).addScaledVector(_f, lerp(0.12, FIELD_REACH, deep));
+  fieldGlow.material.uniforms.uSize.value = lerp(0.12, 0.32, deep);
+  fieldGlow.material.uniforms.uGlow.value = fieldK * lerp(0.5, 0.6, deep) * (0.9 + 0.1 * Math.sin(time * 9));
+  tubeMat.uniforms.uField.value.copy(fieldGlow.position); tubeMat.uniforms.uFieldK.value = fieldK * deep;
+  soundStep(t, going, thr, boost, deep, seen);
+}
+// the ship itself, wherever the rig has put it: how it sways, how it is lit, its engines and the sparks they shed.
+// thr: the engines are lit · boost: they burn hard · deep: inside the tunnel · seen: how much of it is in view
+function shipBody(dt, thr, boost, deep, seen) {
+  _r.setFromMatrixColumn(camera.matrixWorld, 0); _u.setFromMatrixColumn(camera.matrixWorld, 1); camera.getWorldDirection(_f);
 
   // sway: two slow sines each way; the ship leans and noses into its own drift, and into the tunnel's bends
   const yaw = dt > 0 ? _e.subVectors(_f, _fPrev).dot(_r) / dt : 0; _fPrev.copy(_f);
@@ -1062,8 +1155,6 @@ function flyShip(dt, t, s, going, deep) {
   ship.updateMatrix();
 
   // light: the sun outside; inside the tunnel, a dim glow from overhead and ahead
-  const thr = going ? ss(0, 0.3, t) : 0;                                            // the engines light the instant the trip starts…
-  const boost = thr * (1 - 0.55 * ss(S_A, S_A + 8, s));                             // …in a hard burn that holds until the ship is well through
   shipLight.uL.value.copy(_u).multiplyScalar(0.85).addScaledVector(_f, 0.5).normalize().lerp(SUN, 1 - deep).normalize();
   shipLight.uLCol.value.set(lerp(1.0, 0.42, deep), lerp(0.96, 0.46, deep), lerp(0.90, 0.74, deep));
   shipLight.uAmb.value.set(0.05, lerp(0.06, 0.04, deep), 0.09);
@@ -1095,18 +1186,6 @@ function flyShip(dt, t, s, going, deep) {
   }
   trailGeo.attributes.position.needsUpdate = trailGeo.attributes.aSize.needsUpdate = trailGeo.attributes.aAlpha.needsUpdate = true;
   trailPts.material.uniforms.uScale.value = rt.height / (2 * Math.tan(rad(camera.fov) / 2));   // so a size in world units comes out right in pixels
-
-  // the field's glow: it comes on once the ship is at top speed, rides just ahead of the nose on the way out and further
-  // ahead in the tunnel, and fades as the ship leaves the far mouth
-  const fieldK = going ? ss(T_FIELD, T_FIELD + 0.5, t) * (1 - ss(S_B - 5, S_B, s)) : 0;
-  rig.updateMatrixWorld(true);
-  ship.localToWorld(_n.set(0, 0, -0.56));                                           // the nose, for the lens too
-  fieldGlow.visible = fieldK > 0.002;
-  fieldGlow.position.copy(_n).addScaledVector(_f, lerp(0.12, FIELD_REACH, deep));
-  fieldGlow.material.uniforms.uSize.value = lerp(0.12, 0.32, deep);
-  fieldGlow.material.uniforms.uGlow.value = fieldK * lerp(0.5, 0.6, deep) * (0.9 + 0.1 * Math.sin(time * 9));
-  tubeMat.uniforms.uField.value.copy(fieldGlow.position); tubeMat.uniforms.uFieldK.value = fieldK * deep;
-  soundStep(t, going, thr, boost, deep, seen);
 }
 
 // ═════════════════════════════════════════════════════════════════════════
@@ -1163,6 +1242,9 @@ function soundStart() {                                  // a browser only lets 
     [T_RIP_B, 'point', 1], [T_RIP_B + 0.6 / RIP_B_RATE, 'cracks', 1.7 / RIP_B_RATE, 1], [T_RIP_B + RIP_PEEL / RIP_B_RATE, 'peel', (RIP_OPEN - RIP_PEEL) / RIP_B_RATE],
     [T_B - 0.1, 'through', 1],
     [T_PULL + 0.8, 'arrive'],
+  ];
+  S.cuesTM = [                                           // …and on the time machine's clock: the field reaching for mouth B, a bell as it lands, a shimmer at the gap, going through, three bells in the past
+    [T_FLY0 - 1.2, 'field', 1.0], [T_LAND - 0.3, 'point', 1], [T_GAP, 'peel', 1.5], [T_CUT - 0.1, 'through', 1], [T_REST, 'arrive'],
   ];
 }
 
@@ -1249,15 +1331,15 @@ function makeHum(ctx, bus, send) {
   };
 }
 
-function soundStep(t, going, thr, boost, deep, seen) {   // every frame: the beds follow the trip, and anything due on the clock is struck
+function soundStep(t, going, thr, boost, deep, seen, cues = sound.cues, settle = going ? ss(T_PULL, T_DONE, t) : 0) {   // every frame: the beds follow the trip, and anything due on the clock is struck
   const S = sound; if (!S.ctx) return;
   const now = S.ctx.currentTime, from = S.at; S.at = going ? t : -1;
-  const p = { t, going, thr, boost, deep, seen, settle: going ? ss(T_PULL, T_DONE, t) : 0 };
+  const p = { t, going, thr, boost, deep, seen, settle };
   for (const k in S.moods) S.moods[k].step(now, p);
   S.wet.gain.setTargetAtTime(0.35 + 0.3 * deep, now, 0.4);              // the room grows inside the tunnel
   if (!going || t < from || t - from > 0.5) return;      // not flying, or the clock jumped (a replay): nothing is due
   const m = S.moods[S.mode]; if (!m) return;             // off: nothing to strike
-  for (const [at, what, ...args] of S.cues) if (from < at && at <= t && m[what]) m[what](now, ...args);
+  for (const [at, what, ...args] of cues) if (from < at && at <= t && m[what]) m[what](now, ...args);
 }
 
 // ═════════════════════════════════════════════════════════════════════════
@@ -1365,7 +1447,7 @@ function govern(dt) {
 //  THE TRIP — everything on screen is worked out from one clock, `trip`
 // ═════════════════════════════════════════════════════════════════════════
 const query = new URLSearchParams(location.search);
-let time = 0, trip = query.has('t') ? +query.get('t') : -1, fade = 0, phase = '', frameDt = 0;   // trip < 0: waiting by Earth
+let time = 0, trip = query.has('t') && query.get('mode') !== 'time' ? +query.get('t') : -1, fade = 0, phase = '', frameDt = 0;   // trip < 0: waiting by Earth
 const hold = query.has('hold');                                                     // ?t=14&hold freezes a moment to look at
 const touch = matchMedia('(pointer: coarse)').matches;
 
@@ -1476,21 +1558,305 @@ function update() {
   }
 }
 
+
+// ═════════════════════════════════════════════════════════════════════════
+//  THE TIME MACHINE — Kip Thorne's idea of 1988 (Morris, Thorne and
+//  Yurtsever): take one mouth of a wormhole on a fast round trip and its
+//  clock falls behind the other's. Step in through the mouth that stayed
+//  and you come out of the one that went, in its past. Its own clock is
+//  `tm.t`; everything below is worked out from that, act by act.
+// ═════════════════════════════════════════════════════════════════════════
+const tmEl = document.getElementById('tm'), capEl = document.getElementById('cap'), gapEl = document.getElementById('gap'), hudEl = document.getElementById('hud'),
+  noteEl = document.getElementById('note'), ctlEl = document.getElementById('ctl'), vmaxEl = document.getElementById('vmax'), ctlLbl = document.getElementById('ctlLbl'),
+  hudA = document.getElementById('hudA'), hudB = document.getElementById('hudB'), hudV = document.getElementById('hudV'), hudBar = document.getElementById('hudBar'),
+  modeBtn = document.getElementById('mode');
+
+// the physics. A clock moving at v (as a share of the speed of light) runs slow by gamma = 1 / sqrt(1 - v²), so on a
+// trip it gains only (time passed) / gamma. The trip takes FLIGHT_YEARS by Earth's clock whatever the top speed; the
+// ship's speed through it is a hard push up to top speed, a long cruise, a hard brake.
+const gammaOf = v => 1 / Math.sqrt(1 - v * v);
+const FLIGHT_YEARS = 10;
+const ramp = x => { x = clamp01(x); return 1 - Math.pow(1 - x, 4); };
+const vProfile = (u, vmax) => vmax * ramp(u / 0.10) * ramp((1 - u) / 0.10);   // u: 0 at the start of the trip … 1 at its end
+function gapYears(vmax) {                                                       // how far mouth B's clock falls behind: its own time is ∫ dt / gamma
+  let tau = 0; const N = 600;
+  for (let i = 0; i < N; i++) tau += 1 / gammaOf(vProfile((i + 0.5) / N, vmax));
+  return FLIGHT_YEARS * (1 - tau / N);
+}
+const sliderV = x => 1 - 0.5 * Math.pow(0.002, x);                              // the slider: 50% of light at one end, 99.9% at the other, with room at the top where it matters
+const fmtV = v => (v >= 0.99 ? (v * 100).toFixed(1) : Math.round(v * 100)) + '%';
+const fmtGap = y => { const n = y >= 9.95 ? Math.round(y) : Math.round(y * 10) / 10; return n + (n === 1 ? ' year apart' : ' years apart'); };
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dateAfter = (from, years) => new Date(from + years * 365.25 * 864e5);
+const monthOf = d => MON[d.getMonth()] + ' ' + d.getFullYear();
+
+// the acts, in seconds on the time machine's clock: the two mouths · the flight · home, and the gap · in through A, out of B
+const T_FLY0 = 3.0, T_FLY1 = 21.0, T_LAND = 23.0, T_GAP = 24.4, T_ACT4 = 28.5, T_CUT = 33.2, T_REST = 39.5, T_TM_DONE = 41.0;
+const YR_PER_S = FLIGHT_YEARS / (T_FLY1 - T_FLY0);
+const tm = { t: -1, open: 0, vmax: sliderV(0.741), start: Date.now(), yA: 0, yB: 0, handA: 0, handB: 0, past: 0, bank: 0 };   // yA, yB: years on each clock
+
+// the two mouths, side by side out past Earth's limb, torn the way the trip's are; through each one a throat
+const TM_R = 0.30, TM_CAM = V3(1.45, 0.55, 3.7), TM_LOOK = V3(1.35, 0.05, 1.0), TM_VIEW = TM_LOOK.clone().sub(TM_CAM).normalize();
+const TM_A = V3(1.75, 0.08, 1.35), TM_B = V3(2.55, 0.08, 1.35);
+const FACE_A = TM_CAM.clone().sub(TM_A).normalize(), FACE_B = TM_CAM.clone().sub(TM_B).normalize();
+const R_I = V3().crossVectors(TM_VIEW, Y).normalize(), U_I = V3().crossVectors(R_I, TM_VIEW);   // right and up, as the camera waits
+const tmCam = out => out.copy(TM_CAM).addScaledVector(TM_VIEW, -1.0 * clamp01((1 - camera.aspect) / 0.5));   // where it waits: further back on a tall screen, so both mouths fit
+const ripTA = makeRip({ center: TM_A, facing: FACE_A, radius: TM_R, seed: 8101, closed: false, tint: V3(0.55, 0.35, 1.0), key: 1, throat: true });
+const ripTB = makeRip({ center: TM_B, facing: FACE_B, radius: TM_R, seed: 6029, closed: false, tint: V3(1.0, 0.80, 0.52), key: 1, throat: true });
+const Q_B_HOME = ripTB.g.quaternion.clone();
+ripTA.g.visible = ripTB.g.visible = false;
+
+// a clock: a glowing dial with one sweeping hand, the date written on its face (the face is a small canvas, redrawn when the date changes)
+const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+function makeClock(tint) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  const g2 = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv);
+  tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;
+  const U = { uText: { value: tex }, uHand: { value: 0 }, uGlow: { value: 0 }, uTint: { value: tint } };
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
+    uniforms: U,
+    vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: /* glsl */`
+      uniform sampler2D uText; uniform float uHand, uGlow; uniform vec3 uTint; varying vec2 vUv;
+      void main() {
+        vec2 q = vUv - 0.5; float r = length(q);
+        float ring = exp(-pow((r - 0.40) / 0.010, 2.0)) * 0.9 + exp(-pow((r - 0.40) / 0.045, 2.0)) * 0.25;   // the rim, with a soft bloom
+        float ang = atan(q.x, q.y);                                                                           // round the dial, clockwise from the top
+        float ticks = exp(-pow(sin(ang * 6.0) / 0.10, 2.0)) * smoothstep(0.345, 0.355, r) * (1.0 - smoothstep(0.375, 0.385, r)) * 0.7;   // twelve marks
+        vec2 h = vec2(sin(uHand), cos(uHand));
+        float along = dot(q, h), across = abs(dot(q, vec2(h.y, -h.x)));
+        float hand = exp(-pow(across / 0.007, 2.0)) * smoothstep(-0.06, -0.04, along) * (1.0 - smoothstep(0.31, 0.34, along)) * (0.5 + 0.5 * smoothstep(0.0, 0.3, along));
+        float pin = exp(-r * r / 0.0004), text = texture2D(uText, vUv).a;
+        vec3 col = uTint * (ring + ticks + exp(-r * r / 0.10) * 0.10) + mix(uTint, vec3(1.0), 0.75) * (hand * 1.1 + pin) + mix(uTint, vec3(1.0), 0.8) * text * 1.2;
+        gl_FragColor = vec4(col * uGlow, 1.0);
+      }`,
+    transparent: true, ...KEEP_MARK, depthWrite: false,
+  }));
+  m.scale.setScalar(0.62); m.visible = false; m.frustumCulled = false; scene.add(m);
+  let last = '';
+  return { m, U, set(label, d) {
+    const key = label + d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); if (key === last) return; last = key;
+    g2.clearRect(0, 0, 256, 256); g2.fillStyle = '#fff'; g2.textAlign = 'center'; g2.textBaseline = 'middle';
+    try { g2.letterSpacing = '4px'; } catch (err) {}
+    g2.font = '500 15px ' + FONT; g2.fillText(label, 130, 78);
+    g2.font = '300 58px ' + FONT; g2.fillText(d.getFullYear(), 128, 128);
+    g2.font = '500 17px ' + FONT; g2.fillText((MON[d.getMonth()] + ' ' + d.getDate()).toUpperCase(), 130, 176);
+    tex.needsUpdate = true;
+  } };
+}
+const clockA = makeClock(V3(0.62, 0.45, 1.0)), clockB = makeClock(V3(1.0, 0.82, 0.55));
+
+// the flight: one loop out past Earth and back to where it began, the camera on it, the ship ahead of the camera and
+// mouth B ahead of the ship. How far along it is at each moment follows the speed profile, so it eases out and eases in.
+const flyPath = new THREE.CatmullRomCurve3([
+  TM_CAM.clone(), V3(3.4, 0.45, 2.4), V3(9, 0.3, -1.5), V3(22, 0.6, -13), V3(38, 1.6, -19), V3(52, 3.0, -9), V3(56, 4.0, 9), V3(46, 3.6, 27), V3(28, 2.6, 39), V3(12, 1.7, 41),
+  TM_CAM.clone().addScaledVector(TM_VIEW, -18), TM_CAM.clone().addScaledVector(TM_VIEW, -6), TM_CAM.clone(),
+], false, 'centripetal');
+flyPath.arcLengthDivisions = 2000; flyPath.updateArcLengths();
+const FLY_LEAD = 2.0;                                                           // how far ahead of the nose mouth B rides
+const FLY_N = 400, flyTab = new Float32Array(FLY_N + 1);
+{ let s = 0; for (let i = 1; i <= FLY_N; i++) { s += vProfile((i - 0.5) / FLY_N, 1); flyTab[i] = s; } for (let i = 0; i <= FLY_N; i++) flyTab[i] /= s; }
+const flyF = u => { const x = clamp01(u) * FLY_N, i = Math.min(Math.floor(x), FLY_N - 1); return lerp(flyTab[i], flyTab[i + 1], x - i); };
+// the way out of B into the past: out of the mouth, then round to the night side of Earth, where its lights are
+const exit = new THREE.CatmullRomCurve3([TM_B.clone().addScaledVector(FACE_B, 0.15), TM_B.clone().addScaledVector(FACE_B, 1.0), V3(0.5, 1.4, 4.6), V3(-2.2, 1.5, 2.0), V3(-2.7, 1.1, -0.4), V3(-2.0, 0.9, -2.0)], false, 'centripetal');
+exit.arcLengthDivisions = 600; exit.updateArcLengths();
+
+// the words
+let capNow = '', capTimer = 0, phaseTM = '';
+function caption(s) {
+  if (s === capNow) return; capNow = s; clearTimeout(capTimer); capEl.classList.remove('on');
+  capTimer = setTimeout(() => { capEl.textContent = s; capEl.classList.toggle('on', !!s); }, s ? 600 : 0);
+}
+const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
+function ctlUpdate() { ctlLbl.textContent = fmtV(tm.vmax) + ' of light · ' + fmtGap(gapYears(tm.vmax)); }
+vmaxEl.addEventListener('input', () => { tm.vmax = sliderV(vmaxEl.value / 1000); ctlUpdate(); });
+vmaxEl.addEventListener('pointerup', () => vmaxEl.blur());   // (a mouse lets go of it; the keyboard keeps it)
+ctlUpdate();
+
+// which of the two this page is showing: the trip to Saturn, or the time machine
+let mode = 'saturn';
+function setMode(m) {
+  mode = m; fade = 0; sound.at = -1; phase = phaseTM = ''; steer.x = steer.y = steer.vx = steer.vy = 0;
+  modeBtn.textContent = m === 'time' ? 'Earth → Saturn' : 'Time machine';
+  tmEl.classList.toggle('on', m === 'time');
+  trip = -1;
+  if (m === 'time') { tm.t = -1; tm.open = 0; tmReset(); }
+  else {
+    ripTA.g.visible = ripTB.g.visible = clockA.m.visible = clockB.m.visible = fieldGlow.visible = false;
+    DOP.uDop.value = 0; earthMat.uniforms.uPast.value = 0; post.uLensK.value = post.uRod.value = post.uGlass.value = 0;
+    for (const el of [capEl, gapEl, hudEl, noteEl]) el.classList.remove('on');
+    capNow = '';
+  }
+}
+function tmReset() { tm.start = Date.now(); tm.yA = tm.yB = 0; tm.handA = tm.handB = 0; tm.past = 0; tm.bank = 0; earthMat.uniforms.uPast.value = 0; gapEl.classList.remove('on'); }
+function tmStart() { if (tm.t >= 0) fade = 0; tm.t = 0; tmReset(); soundStart(); }   // run again: cut back to the mouths, so it fades in
+modeBtn.addEventListener('click', () => { setMode(mode === 'time' ? 'saturn' : 'time'); modeBtn.blur(); });
+
+const _c = V3(), _l = V3(), _b = V3(), _cu = V3(), _cr = V3(), _ci = V3(), _z = V3(0, 0, 1), _qB = new THREE.Quaternion();
+function updateTM() {
+  const t = tm.t, going = t >= 0, dt = frameDt, tau = tm.open;                     // tau: the mouths' own clock, from the moment this mode was entered
+  const u = clamp01((t - T_FLY0) / (T_FLY1 - T_FLY0)), flying = going && t > T_FLY0 && t < T_FLY1;
+  const v = flying ? vProfile(u, tm.vmax) : 0, gam = gammaOf(v), vK = clamp01((v - 0.2) / 0.8);
+  if (flying) { tm.yA += dt * YR_PER_S; tm.yB += dt * YR_PER_S / gam; }          // the two clocks: Earth's, and the one on the trip
+  const spin = flying ? 1 : 1 / 60;                                                // the hand: once round a second on the trip, once a minute at rest
+  tm.handA += dt * spin * 6.2832; tm.handB += dt * spin * 6.2832 / gam;
+  if (going && t >= T_CUT && !tm.past) { tm.past = 1; earthMat.uniforms.uPast.value = 1; }   // through: it is another year
+
+  // where the camera is, and where it looks
+  const sway = going ? (1 - ss(T_FLY0 - 0.6, T_FLY0 + 1.2, t)) + ss(T_FLY1 - 0.5, T_LAND, t) * (1 - ss(T_ACT4 - 0.8, T_ACT4 + 0.6, t)) : 1;
+  let bankTo = 0;
+  tmCam(_ci);
+  if (!going || t < T_FLY0 || (t >= T_FLY1 && t < T_ACT4)) {                     // at rest by the mouths
+    _c.copy(_ci); _l.copy(TM_VIEW);
+  } else if (t < T_FLY1) {                                                        // the flight
+    const f = flyF(u);
+    flyPath.getPointAt(f, _c); flyPath.getTangentAt(f, _l);
+    _c.lerp(_ci, (1 - ss(0, 1.8, t - T_FLY0)) + ss(T_FLY1 - 2.0, T_FLY1, t));     // (from and to wherever it waits)
+    flyPath.getTangentAt(Math.min(1, f + 0.004), _b);                                 // leaning into the bends
+    bankTo = -Math.max(-0.55, Math.min(0.55, _b.sub(_l).dot(_cr.crossVectors(_l, Y).normalize()) * 8.0)) * vK;
+    _b.copy(TM_VIEW).lerp(_l, ss(0, 2.4, t - T_FLY0)); _l.copy(_b).normalize();   // the view swings from the mouths onto the way ahead as it sets off
+  } else if (t < T_CUT) {                                                         // in through A
+    const p = clamp01((t - T_ACT4) / (T_CUT - T_ACT4));
+    _c.copy(_ci).lerp(_b.copy(TM_A).addScaledVector(FACE_A, 0.12), Math.pow(p, 1.45));
+    _l.copy(TM_VIEW).lerp(_b.copy(TM_A).sub(_c).normalize(), ss(0, 0.35, p)).normalize();
+  } else {                                                                        // out of B, into the past
+    const p = clamp01((t - T_CUT) / (T_REST - T_CUT)), rest = ss(T_REST - 1, T_REST + 3, t);
+    exit.getPointAt(smoother(p), _c);
+    _l.copy(FACE_B).lerp(_b.copy(_c).negate().normalize(), ss(0.0, 0.4, p)).normalize();    // (Earth is at the origin)
+    _c.addScaledVector(_cr.crossVectors(_l, Y).normalize(), Math.sin(time * 0.11) * 0.25 * rest).addScaledVector(Y, Math.sin(time * 0.083 + 2) * 0.18 * rest);
+  }
+  tm.bank += (bankTo - tm.bank) * Math.min(1, dt * 2.5);
+  _c.x += Math.sin(time * 0.23) * 0.04 * sway; _c.y += Math.sin(time * 0.17 + 1.3) * 0.03 * sway;
+  camera.position.copy(_c);
+  camera.up.copy(Y).addScaledVector(_cr.crossVectors(_l, Y).normalize(), Math.sin(tm.bank)).normalize();
+  camera.lookAt(_b.copy(_c).add(_l));
+  camera.fov = baseFov + 5 * vK; camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+  sky.position.copy(_c);
+
+  // what exists right now
+  earthTilt.visible = sky.visible = true; saturn.visible = tube.visible = ripA.g.visible = ripB.g.visible = false;
+  earth.rotation.y = 0.35 + time * 0.03; earthMat.uniforms.uTime.value = time;
+  ripTA.g.visible = ripTB.g.visible = true;
+  ripTA.tick(tau, time); ripTB.tick(tau, time);
+  ripTA.mask.visible = ripTB.mask.visible = tau >= RIP_PEEL;
+
+  // the ship: ahead of the camera and a little below its line of sight, as on the trip; the engines light as it reaches
+  // for mouth B, burn hard on the flight, and light again for the step through
+  const thr = going ? ss(T_FLY0 - 1.2, T_FLY0 - 0.9, t) * (1 - ss(T_FLY1 - 1.0, T_FLY1 + 0.6, t)) + ss(T_ACT4 - 0.6, T_ACT4, t) : 0;
+  const boost = flying ? thr * (0.35 + 0.65 * vK) : t >= T_ACT4 ? 0.6 * thr * (1 - ss(T_CUT + 2, T_REST, t)) : 0;
+  shipDrop = SHIP_DROP * (1 + PULL * vK); shipLead = SHIP_LEAD * (1 + PULL * vK);
+  const aside = going ? ss(T_FLY1 + 0.5, T_LAND + 1, t) * (1 - ss(T_ACT4 - 1.2, T_ACT4 + 0.4, t)) + ss(T_REST - 2.5, T_REST, t) : 0;   // home again, it draws off to the left while the gap is read; and at the end
+  _cr.setFromMatrixColumn(camera.matrixWorld, 0); _cu.setFromMatrixColumn(camera.matrixWorld, 1); camera.getWorldDirection(_b);
+  rig.position.copy(camera.position).addScaledVector(_b, shipLead).addScaledVector(_cu, -shipDrop).addScaledVector(_cr, -0.2 * smoother(aside));
+  rig.quaternion.copy(camera.quaternion);
+  ship.visible = true;
+  shipBody(dt, thr, boost, 0, 1);
+  rig.updateMatrixWorld(true); ship.localToWorld(_n.set(0, 0, -0.56));            // the nose
+
+  // mouth B: the field takes hold of it, carries it ahead of the nose round the whole loop, and sets it down again
+  const grab = going ? ss(T_FLY0 - 1.0, T_FLY0 + 1.6, t) * (1 - ss(T_FLY1 - 0.4, T_LAND, t)) : 0, carried = smoother(grab);
+  const centred = ss(T_FLY0, T_FLY0 + 2.5, t) * (1 - ss(T_FLY1 - 3.0, T_FLY1 + 0.3, t));   // on the flight it rides straight ahead; it slides back to its own place as the ship brakes
+  _b.subVectors(TM_B, _ci);                                                                   // its place, as seen from where the camera waits: right, up, ahead
+  const bx = lerp(_b.dot(R_I), 0, centred), by = lerp(_b.dot(U_I), -shipDrop, centred), bz = lerp(_b.dot(TM_VIEW), shipLead + 0.1 + FLY_LEAD, centred);
+  _b.copy(camera.position).addScaledVector(_cr, bx).addScaledVector(_cu, by + 0.03 * Math.sin(time * 1.3) * centred).addScaledVector(_f, bz);
+  ripTB.g.position.copy(TM_B).lerp(_b, carried);
+  ripTB.g.quaternion.copy(Q_B_HOME).slerp(_qB.setFromUnitVectors(_z, _b.copy(_f).negate()), carried);
+  fieldGlow.visible = grab > 0.002;
+  fieldGlow.position.copy(_n).addScaledVector(_f, 0.22);
+  fieldGlow.material.uniforms.uSize.value = 0.14;
+  fieldGlow.material.uniforms.uGlow.value = grab * 0.5 * (0.9 + 0.1 * Math.sin(time * 9));
+
+  // the clocks, above their mouths, facing the camera, lit once the mouths are open
+  const glow = ss(RIP_OPEN - 1, RIP_OPEN + 1.5, tau) * (going ? 1 - ss(T_CUT, T_CUT + 1, t) : 1);
+  clockA.m.position.copy(TM_A).addScaledVector(_cu, TM_R + 0.36); clockA.m.quaternion.copy(camera.quaternion);
+  clockB.m.position.copy(ripTB.g.position).addScaledVector(_cu, TM_R + 0.36); clockB.m.quaternion.copy(camera.quaternion);
+  clockA.U.uGlow.value = clockB.U.uGlow.value = glow; clockA.m.visible = clockB.m.visible = glow > 0.001;
+  clockA.U.uHand.value = tm.handA; clockB.U.uHand.value = tm.handB;
+  clockA.set('MOUTH A', dateAfter(tm.start, tm.yA)); clockB.set('MOUTH B', dateAfter(tm.start, tm.yB));
+
+  // the shake: a kick as the engines light, a buzz that grows with the speed, a jolt going through
+  const shake = going ? 0.6 * ss(0, 0.06, t - T_FLY0) * Math.exp(-Math.max(0, t - T_FLY0) * 1.5) + 0.4 * vK + 0.9 * Math.exp(-Math.pow((t - T_CUT) / 0.2, 2)) : 0;
+  if (shake > 0.001) {
+    camera.rotateX(shake * 0.0032 * (0.6 * Math.sin(time * 41) + 0.4 * Math.sin(time * 23 + 1.1)));
+    camera.rotateY(shake * 0.0032 * (0.6 * Math.sin(time * 37 + 2.0) + 0.4 * Math.sin(time * 19 + 0.3)));
+    camera.rotateZ(shake * 0.0022 * Math.sin(time * 29 + 0.5));
+    camera.updateMatrixWorld();
+  }
+  camera.getWorldDirection(_fwd);
+
+  // the sky at speed: the stars draw out into streaks rushing from the point ahead, bluer there and redder behind
+  const streaks = sky.getObjectByName('streaks').material.uniforms;
+  streaks.uStreak.value = 0.25 * Math.pow(clamp01((v - 0.3) / 0.7), 2); streaks.uFwd.value.copy(_fwd).applyQuaternion(_skyQinv);
+  DOP.uDop.value = Math.pow(vK, 1.5); DOP.uDopFwd.value.copy(streaks.uFwd.value);
+
+  // the lens: on the flight, the rod of the field from the nose to mouth B and the bend of space round it; then the
+  // bend round A as the ship dives in
+  let lensK = 0, rod = 0, glass = 0;
+  const diving = going && t >= T_ACT4 && t < T_CUT;
+  if (grab > 0 || diving) {
+    const target = diving ? TM_A : ripTB.g.position, depth = _b.subVectors(target, camera.position).dot(_fwd);
+    if (depth > 0.05) {
+      const rScr = TM_R / (depth * 2 * Math.tan(rad(camera.fov) / 2)), near = 1 - ss(0.3, 0.8, rScr);   // its rim, in screen heights; the bend lets go as the mouth swallows the view
+      _b.copy(target).project(camera);
+      post.uLensC.value.set(_b.x * 0.5 + 0.5, _b.y * 0.5 + 0.5); post.uLensR.value = Math.max(rScr, 1e-4);
+      if (diving) { lensK = ss(0, 0.3, (t - T_ACT4) / (T_CUT - T_ACT4)) * 0.8 * near; glass = 0.4 * lensK; }
+      else { lensK = 0.55 * grab * near; rod = grab * ss(0.4, 2.0, _b.subVectors(target, _n).dot(_fwd)); glass = 0.35 * grab; }
+      _b.copy(_n).project(camera);
+      post.uNoseC.value.set(_b.x * 0.5 + 0.5, _b.y * 0.5 + 0.5); post.uRodW.value.set(0.006, Math.max(rScr * 1.1, 0.012));
+    }
+  }
+  post.uLensK.value = lensK; post.uRod.value = rod; post.uRodReach.value = 1.1 * grab; post.uGlass.value = glass;
+  post.uRipple.value = 1; post.uWarp.value = 0;
+  post.uFlash.value = going ? Math.exp(-Math.pow((t - T_CUT) / 0.3, 2)) + 0.12 * Math.exp(-Math.pow((t - T_FLY0) / 0.3, 2)) : 0;
+  post.uFade.value = ss(0, 1.1, fade); post.uTime.value = time;
+  soundStep(t, going, thr, boost, 0, 1, sound.cuesTM, going ? ss(T_REST - 2, T_TM_DONE, t) : 0);
+
+  // the words
+  const hudOn = going && t > T_FLY0 && t < T_FLY1 + 1.0;
+  hudEl.classList.toggle('on', hudOn);
+  if (hudOn) {
+    setText(hudA, 'A · Earth · ' + monthOf(dateAfter(tm.start, tm.yA))); setText(hudB, 'B · ship · ' + monthOf(dateAfter(tm.start, tm.yB)));
+    setText(hudV, fmtV(v) + ' of light speed'); hudBar.style.width = (v * 100).toFixed(1) + '%';
+  }
+  const gapOn = going && t >= T_GAP && t < T_ACT4 + 1.2;
+  if (gapOn) setText(gapEl, fmtGap(tm.yA - tm.yB));
+  gapEl.classList.toggle('on', gapOn);
+  noteEl.classList.toggle('on', going && t >= T_REST - 0.5);
+  ctlEl.classList.toggle('on', !going || t < T_FLY0 - 1.2 || t >= T_TM_DONE);
+  caption(!going || t < T_FLY0 ? 'Two mouths of one wormhole, side by side near Earth. Their clocks agree.'
+    : t < T_LAND ? 'The ship takes mouth B on a ten-year trip at nearly the speed of light. The faster it goes, the slower its clock runs.'
+    : t < T_ACT4 ? 'Mouth B is home again, but its clock has fallen behind.'
+    : t < T_CUT ? 'Step in through A, the mouth that stayed.'
+    : 'Out through B, and it is ' + dateAfter(tm.start, tm.yB).getFullYear() + ': fewer lights on the night side, other clouds.');
+  const now = !going ? 'idle' : t >= T_TM_DONE ? 'done' : 'run';
+  if (now !== phaseTM) {
+    phaseTM = now;
+    hint.textContent = now === 'idle' ? (touch ? 'Tap to start' : 'Tap or press Space to start') : now === 'done' ? (touch ? 'Tap to run it again' : 'Press R to run it again') : '';
+    hint.classList.toggle('on', now !== 'run');
+  }
+}
+if (query.get('mode') === 'time') { setMode('time'); if (query.has('t')) { tm.t = +query.get('t'); tm.open = 30; } }   // ?mode=time&t=12&hold freezes a moment of it to look at
+
 function start() { if (trip >= 0) fade = 0; trip = 0; soundStart(); }                               // a replay cuts back to Earth, so it fades in
 // A press starts the trip when we are waiting by Earth or have arrived; mid-trip it does nothing. It is judged by the
 // clock itself, so it cannot be a frame out of date, and that also makes the several events one tap sends count once.
-const press = e => { if (e && e.target === sndBtn) return; if (trip < 0 || trip >= T_DONE - 1.5) start(); };
+const press = e => {
+  if (e && e.target && e.target.closest && e.target.closest('button, #ctl')) return;            // the buttons and the slider are their own
+  if (mode === 'time') { if (tm.t < 0 || tm.t >= T_TM_DONE) tmStart(); }
+  else if (trip < 0 || trip >= T_DONE - 1.5) start();
+};
 addEventListener('keydown', e => {
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.metaKey || e.ctrlKey || e.altKey || (e.target && e.target.tagName === 'INPUT')) return;
   if (/^(Arrow(Up|Down|Left|Right)|Key[WASD])$/.test(e.code)) { e.preventDefault(); steer.keys.add(e.code); return; }
   if (e.repeat) return;
   if (e.code === 'Space') { e.preventDefault(); press(); }
   else if (e.code === 'KeyM') soundSet(sound.mode === 'off' ? sound.last : 'off');
-  else if (e.code === 'KeyR') start();
+  else if (e.code === 'KeyR') mode === 'time' ? tmStart() : start();
 });
 // anywhere on the page, and by whichever event the browser sends for a tap: not all of them send every one
 for (const type of ['pointerdown', 'touchstart', 'mousedown', 'click']) addEventListener(type, press, { passive: true });
 window.wormhole = { seek: t => { trip = t; }, get t() { return trip; }, get steer() { return [steer.x, steer.y]; }, sound, T_RIP_A, T_A, T_B, T_PULL, T_DONE, V_TOP,
+  tm, setMode, get mode() { return mode; }, gapYears,
   get moons() {                                          // where each moon is on the screen right now: x, y (0…1 from the top-left) and its size in pixels
     const at = moonPts.geometry.attributes.position, sz = moonPts.geometry.attributes.aSize, v = V3(), out = [];
     for (let i = 0; i < at.count; i++) {
@@ -1504,8 +1870,9 @@ let last = performance.now();
 function loop(now) {
   requestAnimationFrame(loop);
   const raw = (now - last) / 1000, dt = Math.min(raw, 0.1); last = now;
-  time += dt; fade += dt; frameDt = dt; if (trip >= 0 && !hold) trip += dt;
-  update();
+  time += dt; fade += dt; frameDt = dt;
+  if (mode === 'time') { if (tm.t >= 0 && !hold) tm.t += dt; tm.open += dt; updateTM(); }
+  else { if (trip >= 0 && !hold) trip += dt; update(); }
   renderer.setRenderTarget(rt); renderer.render(scene, camera);
   renderer.setRenderTarget(null); renderer.render(postScene, postCam);
   if (raw < 0.25) govern(raw);
