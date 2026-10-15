@@ -41,6 +41,7 @@
   #hud { bottom: calc(102px + env(safe-area-inset-bottom)); display: flex; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap; padding: 0 16px;
     font-size: 11px; line-height: 1; font-weight: 500; letter-spacing: .22em; text-transform: uppercase; }
   #hud.on { opacity: .85; }
+  @media (max-width: 600px) { #hud { bottom: calc(136px + env(safe-area-inset-bottom)); } }   /* a narrow screen wraps the flight's caption to three lines: keep the clocks clear of it */
   #hud .bar { display: block; width: 170px; height: 3px; border-radius: 2px; background: rgba(234, 220, 255, .14); overflow: hidden; }
   #hud .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #1ad9c4, #8f6bff); box-shadow: 0 0 10px rgba(138, 43, 226, .9); }
   #ctl { top: calc(46px + env(safe-area-inset-top)); display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px 12px; padding: 0 16px; pointer-events: auto;
