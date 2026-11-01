@@ -4,6 +4,8 @@ A small ship leaves Earth, tears space open, flies through a wormhole and
 comes out at Saturn. One HTML file with three.js; the Earth, the stars and
 the Milky Way are the real ones.
 
+![The ship near Earth, with the two mouths of the wormhole torn open beside it](docs/screenshot.jpg)
+
 **Run it:** open `index.html` in a browser. It loads three.js from a CDN,
 so it needs a network connection the first time.
 
